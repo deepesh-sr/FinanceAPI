@@ -1,5 +1,9 @@
-
+from flask import Flask, jsonify
+from flask_cors import CORS
 import yfinance as yf
+
+app = Flask(__name__)
+CORS(app)  # Enable CORS for frontend access
 
 PORTFOLIO_STOCKS = {
     "Financial Sector": {
@@ -44,6 +48,15 @@ PORTFOLIO_STOCKS = {
         "EASEMYTRIP.NS": "Easemytrip",
     }
 }
+
+
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """Health check endpoint"""
+    return jsonify({
+        "status": "healthy",
+        "message": "Finance API is running"
+    })
 
 
 if __name__ == '__main__':
