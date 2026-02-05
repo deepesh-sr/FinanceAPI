@@ -5,6 +5,13 @@ import yfinance as yf
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend access
 
+# Cache configuration
+CACHE = {
+    "data" : None,
+    "last_updated" : None, 
+    "cache_duration" : timedelta(minutes=15) 
+}
+
 PORTFOLIO_STOCKS = {
     "Financial Sector": {
         "HDFCBANK.NS": "HDFC Bank",
@@ -50,6 +57,14 @@ PORTFOLIO_STOCKS = {
 }
 def get_stock_details():
     """Fetch detailed stock information for all portfolio stocks"""
+
+    # Check if cache is valid or not
+    if CACHE["data"] and CACHE["last_updated"]:
+        time_since_update = datetime.now()- CACHE["last_updated"]
+        if time_since_update < CACHE["cache_duration"]:
+            print("cached data")
+            return CACHE["data"]
+    
     results = []
     
     for sector, stocks in PORTFOLIO_STOCKS.items():
@@ -136,6 +151,10 @@ def get_stock_details():
                     "error": str(e)
                 })
     
+    # Update the cache
+    CACHE["data"] = results
+    CACHE["last_updated"] = datetime.now()
+
     return results
 
 
