@@ -6,7 +6,25 @@ from datetime import datetime, timedelta
 import random
 
 app = Flask(__name__)
-CORS(app)
+
+# Update CORS to allow ngrok
+CORS(app, resources={
+    r"/api/*": {
+        "origins": [
+            "https://fin-board-silk-sigma.vercel.app",
+            "https://faucal-margaret-lowerable.ngrok-free.dev/api/stocks",
+            "https://*.ngrok-free.app",  # New ngrok domain
+            "https://*.ngrok.io",         # Old ngrok domain
+            "http://localhost:3000",
+            "http://localhost:5173"
+        ],
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type"],
+        "expose_headers": ["*"],
+        "supports_credentials": False
+    }
+})
+
 
 # Cache configuration - Increase to 30 minutes for production
 CACHE = {
@@ -84,30 +102,11 @@ def get_stock_details():
             }
             all_symbols.append(symbol)
 
-    # Process stocks in smaller batches with delays
-    batch_size = 3  # Reduced from 5 to 3 for better rate limiting
-    total_batches = (len(all_symbols) + batch_size - 1) // batch_size
-    
-    print(f"Processing {len(all_symbols)} stocks in {total_batches} batches...")
-    
-    for batch_num in range(0, len(all_symbols), batch_size):
-        batch_symbols = all_symbols[batch_num:batch_num + batch_size]
-        current_batch = (batch_num // batch_size) + 1
-        
-        print(f"Batch {current_batch}/{total_batches}: {batch_symbols}")
-        
-        # Add increasing delay between batches
-        if batch_num > 0:
-            delay = random.uniform(3, 5)  # Random delay between 3-5 seconds
-            print(f"Waiting {delay:.1f}s before next batch...")
-            time.sleep(delay)
-        
-        # Process each stock in the batch
-        for symbol in batch_symbols:
+
+
+    # Process each stock in the batch
+    for symbol in all_symbols:
             try:
-                # Add small delay between individual stocks
-                time.sleep(random.uniform(0.5, 1.0))
-                
                 ticker = yf.Ticker(symbol)
                 
                 # Get basic info first
