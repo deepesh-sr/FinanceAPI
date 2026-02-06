@@ -19,18 +19,18 @@ CORS(app, resources={
             "http://localhost:5173"
         ],
         "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type"],
+        "allow_headers": ["Content-Type","ngrok-skip-browser-warning"],
         "expose_headers": ["*"],
         "supports_credentials": False
     }
 })
 
 
-# Cache configuration - Increase to 30 minutes for production
+# Cache configuration - Increase to 3 minutes
 CACHE = {
     "data": None,
     "last_updated": None, 
-    "cache_duration": timedelta(minutes=30)  # Increased from 15 to 30 minutes
+    "cache_duration": timedelta(minutes=30)
 }
 
 PORTFOLIO_STOCKS = {
@@ -212,6 +212,58 @@ def get_stock_details():
     print(f"✓ Successfully fetched {len(results)} stocks. Cache updated.")
     return results
 
+def get_current_market_price():
+    """Fetch detailed stock information for all portfolio stocks"""
+    results = []
+    
+    # Storing symbol sector and company name
+    symbol_mapping = {}
+    all_symbols = []
+
+    for sector, stocks in PORTFOLIO_STOCKS.items():
+        for symbol, company_name in stocks.items():
+            symbol_mapping[symbol] = {
+                "sector": sector,
+                "company_name": company_name
+            }
+            all_symbols.append(symbol)
+
+    # Process each stock in the batch
+    for symbol in all_symbols:
+            try:
+                ticker = yf.Ticker(symbol)
+                
+                # Get basic info first
+                info = ticker.info
+                
+                # Get current market price
+                hist = ticker.history(period="1d")
+                cmp = round(hist['Close'].iloc[-1], 2) if not hist.empty else info.get('currentPrice')
+                
+                stock_data = {
+                    "cmp": cmp,
+                }
+                results.append(stock_data)
+                print(f"  ✓ {symbol}")
+                
+            except Exception as e:
+                error_msg = str(e)
+                print(f"  ✗ {symbol}: {error_msg}")
+                
+                # If we hit rate limit, wait longer
+                if "429" in error_msg or "Too Many Requests" in error_msg:
+                    print("  ⚠️  Rate limit detected! Waiting 10 seconds...")
+                    time.sleep(10)
+                
+                results.append({
+                    "sector": symbol_mapping[symbol]["sector"],
+                    "symbol": symbol,
+                    "company_name": symbol_mapping[symbol]["company_name"],
+                    "error": error_msg
+                })
+    
+    return results
+
 
 @app.route('/api/stocks', methods=['GET'])
 def get_all_stocks():
@@ -231,6 +283,24 @@ def get_all_stocks():
             "success": False,
             "error": str(e)
         }), 500
+
+
+@app.route('/api/prices', methods=['GET'])
+def get_live_prices():
+    """API endpoint to get all portfolio stocks data"""
+    try:
+        stocks_cmp = get_current_market_price()
+        return jsonify({
+            "success": True,
+            "total_stocks": len(stocks_cmp),
+            "data": stocks_cmp
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
 
 
 @app.route('/api/health', methods=['GET'])
